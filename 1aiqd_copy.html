@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>智绘医疗 </title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1E88E5',
+            neutral: { 50:'#FAFBFC', 100:'#F5F7FA',200:'#E4E7EB',300:'#CBD2D9',400:'#9AA5B1',600:'#52606D',800:'#1F2933' }
+          },
+          boxShadow: { card:'0 2px 8px rgba(0,0,0,0.08)' }
+        }
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities{
+      .card { @apply bg-white border border-neutral-200 rounded-lg shadow-card p-4; }
+      .btn { @apply font-semibold rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-primary/30; }
+      .btn-primary { @apply btn bg-primary text-white hover:bg-primary/90; }
+      .btn-ghost { @apply btn bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-100; }
+      .btn-disabled { @apply btn bg-neutral-300 text-neutral-500 cursor-not-allowed; }
+      .pill { @apply text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold; }
+      .kv { @apply flex items-center justify-between gap-3; }
+      .k { @apply text-neutral-600; }
+      .v { @apply text-neutral-800 font-semibold; }
+      .muted { @apply text-neutral-400; }
+    }
+  </style>
+
+  <style>
+    input[type="range"]{ -webkit-appearance:none; appearance:none; width:100%; background:transparent; height:8px; border-radius:999px; }
+    input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none; appearance:none; width:20px; height:20px; border-radius:50%;
+      background:#1E88E5; margin-top:-6px; box-shadow:0 2px 6px rgba(0,0,0,.3); cursor:pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track{ height:8px; border-radius:999px; background:transparent; }
+    input[type="range"]::-moz-range-thumb{
+      width:20px;height:20px;border-radius:50%;background:#1E88E5;border:none;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer;
+    }
+    input[type="range"]::-moz-range-track{ height:8px;border-radius:999px;background:transparent; }
+
+    .auto-switch{ width:36px;height:22px;border-radius:999px;background:#d7dde8;border:none;position:relative;cursor:pointer;transition:.2s; }
+    .auto-switch::after{ content:"";width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:3px;left:3px;
+      box-shadow:0 2px 6px rgba(15,23,42,.2);transition:transform .2s; }
+    .auto-switch-on{ background:#1E88E5; }
+    .auto-switch-on::after{ transform:translateX(14px); }
+
+    .skeleton{
+      background: linear-gradient(90deg, rgba(203,210,217,.4), rgba(203,210,217,.15), rgba(203,210,217,.4));
+      background-size: 200% 100%;
+      animation: shimmer 1.1s infinite;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  </style>
+</head>
+
+<body class="bg-neutral-100 text-neutral-600 min-h-screen flex flex-col">
+<header class="bg-white border-b border-neutral-200 h-14 flex items-center px-6 sticky top-0 z-10">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><i class="fa fa-plus text-white text-sm"></i></div>
+    <span class="font-bold text-neutral-800 text-lg">智绘医疗</span>
+  </div>
+
+  <div class="flex-1 text-center">
+    <h1 class="font-bold text-neutral-800 text-lg md:text-xl">单眼眼底辅助诊断展示</h1>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <span class="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-semibold border border-amber-200">
+     
+    </span>
+  </div>
+</header>
+
+<main class="flex-1 p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <!-- 左：上传 + 预处理 -->
+  <section class="card flex flex-col">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold text-neutral-800">眼底图像</h2>
+      <label for="fundus-upload" class="btn-primary text-sm px-3 py-2 cursor-pointer">
+        <i class="fa fa-upload mr-2"></i>上传
+      </label>
+      <input id="fundus-upload" type="file" accept="image/*" class="hidden">
+    </div>
+
+    <div id="fundus-preview" class="border border-neutral-200 rounded-md bg-white min-h-[360px] flex items-center justify-center mb-4 overflow-hidden relative">
+      <div class="preview-placeholder absolute inset-0 flex flex-col items-center justify-center text-neutral-300">
+        <i class="fa fa-image text-4xl mb-3"></i>
+        <p class="text-base">上传图像以预览</p>
+      </div>
+      <img id="fundus-image" class="max-w-full max-h-[360px] object-contain z-10 hidden" alt="fundus">
+    </div>
+
+    <div class="space-y-4">
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-neutral-800 w-12" for="fundus-brightness">亮度</label>
+        <input type="range" id="fundus-brightness" min="0" max="200" value="100" class="flex-1">
+        <span id="fundus-brightness-value" class="w-10 text-center text-sm">100</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-neutral-800 w-12" for="fundus-contrast">对比</label>
+        <input type="range" id="fundus-contrast" min="0" max="200" value="100" class="flex-1">
+        <span id="fundus-contrast-value" class="w-10 text-center text-sm">100</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span class="text-sm text-neutral-800">自适应</span>
+        <button type="button" class="auto-switch" id="auto-switch" aria-pressed="false"></button>
+        <span class="text-xs text-neutral-400">仅建议亮度/对比度</span>
+      </div>
+
+      <button id="demo-generate" class="btn-disabled py-3 text-base" disabled>
+        <i class="fa fa-bolt mr-2"></i>一键生成诊断结果
+      </button>
+
+      <div class="border-t border-neutral-200 pt-4 space-y-2 text-sm">
+        <div class="kv"><span class="k">输入</span><span id="meta-input" class="muted">未上传</span></div>
+        <div class="kv"><span class="k">输出病灶数</span><span id="meta-n" class="muted">—</span></div>
+        <div class="kv"><span class="k">生成时间</span><span id="meta-time" class="muted">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 中：原型 & 激活图 -->
+  <section class="card flex flex-col">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold text-neutral-800">原型图 & 激活图</h2>
+      <span class="pill">7类病灶</span>
+    </div>
+
+    <div id="viz-wrap" class="border border-neutral-200 rounded-md bg-white p-4 min-h-[640px] overflow-auto">
+      <div id="viz-placeholder" class="h-[560px] flex flex-col items-center justify-center text-neutral-300">
+        <i class="fa fa-clone text-4xl mb-3"></i>
+        <p class="text-base text-center">点击“生成诊断结果”后展示</p>
+      </div>
+      <div id="viz-container" class="hidden space-y-4"></div>
+    </div>
+  </section>
+
+  <!-- 右：风险概率 & 一致性 + 报告 -->
+  <section class="card flex flex-col gap-4">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold text-neutral-800">概率 & 一致性</h2>
+      <span class="pill">全量7类</span>
+    </div>
+
+    <div class="border border-neutral-200 rounded-md bg-white p-4">
+      <div class="text-sm text-neutral-800 font-semibold mb-3">
+        <i class="fa fa-bar-chart mr-2 text-primary"></i>风险概率 & 一致性检验
+      </div>
+      <div id="score-table" class="text-sm text-neutral-400">
+        暂无结果
+      </div>
+    </div>
+
+    <div class="border border-neutral-200 rounded-md bg-white p-4 flex-1">
+      <div class="text-sm text-neutral-800 font-semibold mb-3">
+        <i class="fa fa-file-text-o mr-2 text-primary"></i>结构化报告
+      </div>
+      <div id="report" class="text-sm leading-relaxed text-neutral-400">
+        上传图像后点击“一键生成诊断结果”。
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="bg-white border-t border-neutral-200 py-4 px-6 text-center text-neutral-400 text-sm">
+  © 2025 智绘医疗 
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ====== 7类（按你截图命名）======
+  const CATALOG = [
+    { key:'jinshi', name:'近视', proto:'eye_iv_jinshi', act:'eye_relu_jinshi', baseScore: 32.0,
+      report:{ diagnosis:'提示屈光相关改变风险；如为高度近视需关注眼底结构改变。', advice:'规范验光配镜；高度近视建议定期眼底照相/OCT随访。', lifestyle:'减少长时间近距离用眼，20-20-20，用眼与户外结合。' } },
+    { key:'qingguang', name:'青光眼', proto:'eye_iv_qingguang', act:'eye_relu_qingguang', baseScore: 30.0,
+      report:{ diagnosis:'提示视神经相关风险，建议结合眼压、视野、视盘/OCT进一步确认。', advice:'完善眼压测量、视野检查与OCT；必要时遵医嘱降眼压治疗。', lifestyle:'规律作息，避免血压/情绪大幅波动，按医嘱随访。' } },
+    { key:'baineizhang', name:'白内障', proto:'eye_iv_baineizhang', act:'eye_relu_baineizhang', baseScore: 28.5,
+      report:{ diagnosis:'提示晶状体混浊可能，可能出现视力下降、眩光与对比敏感度降低。', advice:'建议裂隙灯检查明确分级；影响生活时评估手术时机。', lifestyle:'注意防紫外线，控制血糖等全身因素。' } },
+    { key:'laonianxinghuangbanbinbian', name:'老年性黄斑变性（AMD）', proto:'eye_iv_laonianxinghuangbanbinbian', act:'eye_relu_laonianxinghuangbanbinbian', baseScore: 35.0,
+      report:{ diagnosis:'提示黄斑区相关风险，需结合OCT/眼底荧光造影等进一步评估。', advice:'建议完善黄斑OCT检查；如疑似进展，按医嘱随访与干预。', lifestyle:'戒烟控压，均衡饮食，遵医嘱补充相关营养素（如适用）。' } },
+    { key:'shishengjinweisuo', name:'视神经萎缩', proto:'eye_iv_shishengjinweisuo', act:'eye_relu_shishengjinweisuo', baseScore: 31.5,
+      report:{ diagnosis:'提示视神经结构/功能异常风险，需结合视力、视野与OCT综合判断。', advice:'建议完善视野检查与视神经OCT；必要时进一步排查病因。', lifestyle:'规律作息，避免长时间用眼疲劳，按医嘱随访复查。' } },
+    { key:'tangniaobingshiwangmobinbian', name:'糖尿病视网膜病变（DR）', proto:'eye_iv_tangniaobingshiwangmobinbian', act:'eye_relu_tangniaobingshiwangmobinbian', baseScore: 36.0,
+      report:{ diagnosis:'提示糖网相关改变风险，建议结合病史与眼底/黄斑检查进一步分级。', advice:'控制血糖血压血脂；眼科评估是否需要激光/注药等治疗。', lifestyle:'规律监测血糖，健康饮食与运动，按医嘱定期复查。' } },
+    { key:'gaoxueyaxingshiwangmobinbian', name:'高血压性视网膜病变', proto:'eye_iv_gaoxueyaxingshiwangmobinbian', act:'eye_relu_gaoxueyaxingshiwangmobinbian', baseScore: 34.0,
+      report:{ diagnosis:'提示血压相关视网膜改变风险，建议结合血压控制情况与眼底表现判断。', advice:'建议规范控压；必要时眼科评估视网膜改变程度并随访。', lifestyle:'低盐饮食，规律作息，监测血压，避免剧烈波动。' } },
+  ];
+
+  // ====== DOM ======
+  const upload = document.getElementById('fundus-upload');
+  const img = document.getElementById('fundus-image');
+  const preview = document.getElementById('fundus-preview');
+  const placeholder = preview.querySelector('.preview-placeholder');
+
+  const btnGen = document.getElementById('demo-generate');
+
+  const vizPlaceholder = document.getElementById('viz-placeholder');
+  const vizContainer = document.getElementById('viz-container');
+
+  const scoreTable = document.getElementById('score-table');
+  const report = document.getElementById('report');
+
+  const metaInput = document.getElementById('meta-input');
+  const metaN = document.getElementById('meta-n');
+  const metaTime = document.getElementById('meta-time');
+
+  const bSlider = document.getElementById('fundus-brightness');
+  const cSlider = document.getElementById('fundus-contrast');
+  const bVal = document.getElementById('fundus-brightness-value');
+  const cVal = document.getElementById('fundus-contrast-value');
+  const autoBtn = document.getElementById('auto-switch');
+
+  // ====== State for deterministic output ======
+  let currentImageKey = null; // sha256 hex
+  let currentSeed = 0;        // 32-bit seed
+
+  // ====== Utils ======
+  function clamp(n,a,b){ return Math.min(Math.max(n,a),b); }
+  function setSliderFill(slider){
+    const min = Number(slider.min||0), max = Number(slider.max||100), v = Number(slider.value||0);
+    const p = ((v-min)*100)/(max-min||1);
+    slider.style.background = `linear-gradient(to right, #1E88E5 0%, #1E88E5 ${p}%, #CBD2D9 ${p}%, #CBD2D9 100%)`;
+  }
+
+  function setImgSrcWithFallback(imgEl, baseNoExt){
+    const exts = ['png','jpg','jpeg'];
+    let i = 0;
+    const tryNext = () => {
+      if(i >= exts.length){ imgEl.src=''; imgEl.alt='Not found: '+baseNoExt; return; }
+      imgEl.src = `${baseNoExt}.${exts[i++]}`;
+    };
+    imgEl.onerror = tryNext;
+    tryNext();
+  }
+
+  // score -> prob (sigmoid-like)
+  function scoreToProb(score){
+    const x = (score - 30) / 6;
+    const p = 1 / (1 + Math.exp(-x));
+    return clamp(p, 0.01, 0.99);
+  }
+
+  // consistency from two-view probabilities
+  function consistencyScore(p1, p2, dmax=0.25){
+    const d = Math.abs(p1 - p2);
+    return clamp(100 * (1 - d / dmax), 0, 100);
+  }
+
+  // ====== Deterministic RNG (seeded) ======
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function() {
+      a += 0x6D2B79F5;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function seedFromSha256Hex(hex) {
+    return parseInt(hex.slice(0, 8), 16) >>> 0;
+  }
+
+  async function sha256Hex(arrayBuffer) {
+    const digest = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const bytes = new Uint8Array(digest);
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+  function sampleKDet(arr, k, rand){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(rand()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a.slice(0,k);
+  }
+
+  // ====== 预处理：亮度/对比（针对上传图）======
+  let canvas = document.createElement('canvas');
+  let ctx = canvas.getContext('2d');
+  let ori = null;
+
+  function computeAutoAdjust(imageEl){
+    const w=imageEl.naturalWidth, h=imageEl.naturalHeight;
+    if(!w||!h) return {brightness:120, contrast:115};
+    const cv = document.createElement('canvas');
+    const cx = cv.getContext('2d', {willReadFrequently:true});
+    const target = 256;
+    const scale = Math.min(1, target / Math.max(w,h));
+    cv.width = Math.max(1, Math.floor(w*scale));
+    cv.height = Math.max(1, Math.floor(h*scale));
+    cx.drawImage(imageEl,0,0,cv.width,cv.height);
+    const {data} = cx.getImageData(0,0,cv.width,cv.height);
+
+    let sum=0,sumSq=0; const pixels = data.length/4 || 1;
+    for(let i=0;i<data.length;i+=4){
+      const g = 0.299*data[i]+0.587*data[i+1]+0.114*data[i+2];
+      sum+=g; sumSq+=g*g;
+    }
+    const mean=sum/pixels;
+    const std=Math.sqrt(Math.max(sumSq/pixels-mean*mean,0));
+    const brightness = clamp(Math.round(100 + (128-mean)/1.28), 40, 170);
+    const contrast = clamp(Math.round(100 + (64-std)/0.64), 40, 190);
+    return {brightness, contrast};
+  }
+
+  function applyFilters(){
+    if(!ori) return;
+    const b=Number(bSlider.value), c=Number(cSlider.value);
+    bVal.textContent=String(b); cVal.textContent=String(c);
+    setSliderFill(bSlider); setSliderFill(cSlider);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.filter = `brightness(${b}%) contrast(${c}%)`;
+    ctx.drawImage(ori,0,0,canvas.width,canvas.height);
+    img.src = canvas.toDataURL('image/png');
+  }
+
+  bSlider.addEventListener('input', applyFilters);
+  cSlider.addEventListener('input', applyFilters);
+  setSliderFill(bSlider); setSliderFill(cSlider);
+
+  autoBtn.addEventListener('click', () => {
+    const on = autoBtn.classList.toggle('auto-switch-on');
+    autoBtn.setAttribute('aria-pressed', on ? 'true':'false');
+    if(!on){
+      bSlider.value=100; cSlider.value=100;
+      applyFilters(); return;
+    }
+    const src = ori || img;
+    const {brightness, contrast} = computeAutoAdjust(src);
+    bSlider.value=brightness; cSlider.value=contrast;
+    applyFilters();
+  });
+
+  // ====== UI Reset ======
+  function resetOutputs(){
+    vizPlaceholder.classList.remove('hidden');
+    vizContainer.classList.add('hidden');
+    vizContainer.innerHTML='';
+    scoreTable.className='text-sm text-neutral-400';
+    scoreTable.textContent='暂无结果';
+    report.className='text-sm leading-relaxed text-neutral-400';
+    report.textContent='上传图像后点击“一键生成诊断结果”。';
+    metaN.textContent='—';
+    metaTime.textContent='—';
+  }
+
+  // ====== Upload (with SHA-256) ======
+  upload.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    resetOutputs();
+
+    if(!file){
+      img.dataset.loaded='false';
+      btnGen.disabled=true;
+      btnGen.className='btn-disabled py-3 text-base';
+      metaInput.textContent='未上传';
+      currentImageKey = null;
+      currentSeed = 0;
+      return;
+    }
+
+    metaInput.textContent = file.name;
+
+    // SHA-256 for deterministic output per image
+    const buf = await file.arrayBuffer();
+    currentImageKey = await sha256Hex(buf);
+    currentSeed = seedFromSha256Hex(currentImageKey);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      img.dataset.loaded='true';
+      img.dataset.fromUpload='true';
+      img.dataset.fromUpload = 'true';
+      img.src = ev.target.result;
+      img.classList.remove('hidden');
+      placeholder.classList.add('hidden');
+
+      autoBtn.classList.remove('auto-switch-on');
+      autoBtn.setAttribute('aria-pressed','false');
+      bSlider.value=100; cSlider.value=100;
+      bVal.textContent='100'; cVal.textContent='100';
+      setSliderFill(bSlider); setSliderFill(cSlider);
+
+      btnGen.disabled=false;
+      btnGen.className='btn-primary py-3 text-base';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  img.addEventListener('load', () => {
+    if(img.dataset.fromUpload === 'true'){
+      ori = new Image();
+      ori.src = img.src;
+      canvas.width = img.naturalWidth || 1;
+      canvas.height = img.naturalHeight || 1;
+      img.dataset.fromUpload = 'false';
+      applyFilters();
+    }
+  });
+
+  // ====== Viz and Report builders ======
+  function buildVizCard(item, idx, prob, cons){
+    const card = document.createElement('div');
+    card.className = 'border border-neutral-200 rounded-lg p-3 bg-white';
+
+    const probPct = (prob*100).toFixed(1) + '%';
+    const consStr = cons.toFixed(1);
+
+    card.innerHTML = `
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <div class="font-semibold text-neutral-800">结果 ${idx+1}：${item.name}</div>
+        <div class="text-right">
+          <div class="text-xs text-neutral-400">风险概率</div>
+          <div class="font-bold text-neutral-800">${probPct}</div>
+          <div class="text-xs text-neutral-400 mt-1">一致性得分</div>
+          <div class="font-bold text-neutral-800">${consStr}</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <figure class="flex flex-col">
+          <figcaption class="text-sm text-neutral-600 mb-2">原型图</figcaption>
+          <img class="proto w-full max-h-[220px] object-contain rounded-md border border-neutral-200 bg-neutral-50" alt="proto">
+        </figure>
+        <figure class="flex flex-col">
+          <figcaption class="text-sm text-neutral-600 mb-2">激活图</figcaption>
+          <img class="act w-full max-h-[220px] object-contain rounded-md border border-neutral-200 bg-neutral-50" alt="act">
+        </figure>
+      </div>
+    `;
+    setImgSrcWithFallback(card.querySelector('img.proto'), item.proto);
+    setImgSrcWithFallback(card.querySelector('img.act'), item.act);
+    return card;
+  }
+
+  function buildScoreTable(allRows, highlightKeys){
+    const head = `
+      <div class="grid grid-cols-3 gap-2 text-xs text-neutral-400 mb-2">
+        <div>病灶</div>
+        <div class="text-center">风险概率</div>
+        <div class="text-right">一致性</div>
+      </div>
+      <div class="h-px bg-neutral-200 mb-2"></div>
+    `;
+
+    const rows = allRows.map(r => {
+      const pPct = (r.p*100).toFixed(1);
+      const cons = r.cons.toFixed(1);
+      const isHi = highlightKeys.has(r.key);
+
+      return `
+        <div class="grid grid-cols-3 gap-2 items-center py-1.5 ${isHi ? 'bg-primary/5 rounded-md px-2' : ''}">
+          <div class="text-neutral-700 flex items-center gap-2">
+            <span>${r.name}</span>
+            ${isHi ? '<span class="pill">本次报告</span>' : ''}
+          </div>
+          <div class="text-center">
+            <div class="h-2 bg-neutral-200 rounded-full overflow-hidden">
+              <div class="h-2 bg-primary" style="width:${Math.round(r.p*100)}%"></div>
+            </div>
+            <div class="text-xs text-neutral-400 mt-1">${pPct}%</div>
+          </div>
+          <div class="text-right">
+            <div class="font-semibold text-neutral-800">${cons}</div>
+            <div class="text-xs text-neutral-400">/ 100</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return head + rows;
+  }
+
+  function buildReport(selRows){
+    const timeStr = new Date().toLocaleString();
+    const list = selRows.map((r,i) => `
+      <div class="space-y-1">
+        <div class="font-semibold text-neutral-800">${i+1}. ${r.ref.name}（风险 ${(r.p*100).toFixed(1)}%，一致性 ${r.cons.toFixed(1)}）</div>
+        <div><strong>诊断提示：</strong>${r.ref.report.diagnosis}</div>
+        <div><strong>建议：</strong>${r.ref.report.advice}</div>
+        <div><strong>生活方式：</strong>${r.ref.report.lifestyle}</div>
+      </div>
+    `).join('<hr class="border-neutral-200 my-3">');
+
+    return `
+      <div class="space-y-3 text-neutral-700">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-sm text-neutral-600">
+            <span class="font-semibold text-neutral-800">报告病灶：</span>${selRows.map(x=>x.ref.name).join(' / ')}
+          </div>
+          <div class="text-xs text-neutral-400">${timeStr}</div>
+        </div>
+        <div class="text-xs text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded">
+         
+        </div>
+        ${list}
+      </div>
+    `;
+  }
+
+  function showLoading(){
+    vizPlaceholder.classList.add('hidden');
+    vizContainer.classList.remove('hidden');
+    vizContainer.innerHTML = `
+      <div class="border border-neutral-200 rounded-lg p-3 bg-white skeleton h-[180px]"></div>
+      <div class="border border-neutral-200 rounded-lg p-3 bg-white skeleton h-[180px]"></div>
+      <div class="border border-neutral-200 rounded-lg p-3 bg-white skeleton h-[180px]"></div>
+    `;
+    scoreTable.className='text-sm text-neutral-600';
+    scoreTable.innerHTML = `<div class="skeleton h-28 rounded"></div>`;
+    report.className='text-sm leading-relaxed text-neutral-600';
+    report.innerHTML = `<div class="skeleton h-44 rounded"></div>`;
+  }
+
+  // ====== Main: deterministic per image ======
+  btnGen.addEventListener('click', () => {
+    if(img.dataset.loaded !== 'true' || !currentImageKey) return;
+
+    showLoading();
+
+    setTimeout(() => {
+      const rand = mulberry32(currentSeed);
+
+      const k = 1 + Math.floor(rand()*3);              // 1~3（同图固定）
+      const picked = sampleKDet(CATALOG, k, rand);     // 同图固定
+      const pickedKeys = new Set(picked.map(x=>x.key));
+
+      const allRows = CATALOG.map(ref => {
+        const base = ref.baseScore;
+
+        const score = pickedKeys.has(ref.key)
+          ? clamp(base + (rand()*2-1)*2.2, 22, 55)
+          : clamp((18 + rand()*8) + (rand()*2-1)*1.2, 5, 32);
+
+        const p_center = scoreToProb(score);
+
+        const jitter = pickedKeys.has(ref.key) ? 0.03 : 0.02;
+        const p1 = clamp(p_center + (rand()*2-1)*jitter, 0.01, 0.99);
+        const p2 = clamp(p_center + (rand()*2-1)*jitter, 0.01, 0.99);
+
+        const cons = consistencyScore(p1, p2, 0.18);
+
+        return { key: ref.key, name: ref.name, p: p_center, cons, ref };
+      });
+
+      const allSorted = allRows.slice().sort((a,b)=>b.p - a.p);
+      const selRows = allRows.filter(r => pickedKeys.has(r.key)).sort((a,b)=>b.p - a.p);
+
+      vizContainer.innerHTML = '';
+      selRows.forEach((r,i) => vizContainer.appendChild(buildVizCard(r.ref, i, r.p, r.cons)));
+
+      scoreTable.className='text-sm';
+      scoreTable.innerHTML = buildScoreTable(allSorted, pickedKeys);
+
+      report.className='text-sm leading-relaxed';
+      report.innerHTML = buildReport(selRows);
+
+      metaN.textContent = String(k);
+      metaTime.textContent = new Date().toLocaleTimeString();
+    }, 550);
+  });
+
+  // init
+  resetOutputs();
+});
+</script>
+</body>
+</html>
